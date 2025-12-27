@@ -1,0 +1,41 @@
+cff-version: 1.2.0
+
+title: "reconvergentai: Open-Science Reproduction and Enhancement of AI Research"
+
+message: >
+  If you use this repository for research, benchmarking, or educational purposes,
+  please cite it using the metadata below.
+
+authors:
+  - family-names: Bhandari
+    given-names: Basant Babu
+    affiliation: Independent Researcher
+    country: Nepal
+
+repository-code: https://github.com/basantbhandari/reconvergentai
+
+abstract: >
+  reconvergentai is an open-science research initiative focused on the faithful
+  reproduction, rigorous evaluation, and principled enhancement of major
+  discoveries in artificial intelligence using mathematics and computer science.
+
+keywords:
+  - artificial intelligence
+  - machine learning
+  - reproducibility
+  - open science
+  - statistical learning theory
+  - optimization
+  - deep learning
+
+license: MIT
+year-released: 2025
+
+preferred-citation:
+  type: software
+  title: "reconvergentai"
+  authors:
+    - family-names: Bhandari
+      given-names: Basant Babu
+  year: 2025
+  url: https://github.com/basantbhandari/reconvergentai
