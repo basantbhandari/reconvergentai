@@ -37,4 +37,16 @@ When you're done working in the virtual environment:
 deactivate
 ```
 
+1. positional encoding 
+2. encoder 
+3. decoder 
+4. self attention 
+5. multi head attention 
+6. value, key, queries 
+7. add and norm 
+8. feed forward
+
+
+
+
 
