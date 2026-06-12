@@ -2,4 +2,13 @@
 name = "reconvergentai"
 version = "0.1.0"
 requires-python = ">=3.9"
-dependencies = []
+dependencies = [
+    "altair>=6.0.0",
+    "datasets>=4.5.0",
+    "pandas>=2.3.3",
+    "tokenizers>=0.22.2",
+    "torch>=2.8.0",
+    "torchmetrics>=1.8.2",
+    "tqdm>=4.68.2",
+    "wandb>=0.26.1",
+]
