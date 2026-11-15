@@ -11,10 +11,52 @@ The dataset is downloaded automatically from the Hugging Face Hub.
 
 ## Results
 
-> **Pending:** the 20-epoch training run started on 2026-11-15 is still in progress.
-> This section will be filled in with the measured scores from `evaluate.py`:
-> held-out BLEU / CER / WER, training curves (`results/training_curves.svg`) and
-> sample translations (`results/translations.md`).
+20 epochs on an Apple M5 (MPS), about 2 hours of training. Both saved checkpoints were
+evaluated with greedy decoding on the **full held-out split (3,233 sentences never seen in
+training)** and on an equal-sized slice of the training set:
+
+| Checkpoint | Epoch | Val loss | Held-out BLEU | Held-out CER | Held-out WER | Train-slice BLEU |
+|---|---|---|---|---|---|---|
+| `best.pt` (lowest validation loss) | 11 | **4.759** | 6.14 | **0.679** | 0.897 | 9.71 |
+| `tmodel_19.pt` (final epoch) | 20 | 5.159 | **6.96** | 0.682 | **0.885** | 31.12 |
+
+![Training and validation loss, and per-epoch BLEU](results/training_curves.svg)
+
+What the numbers show:
+
+- **The model learns to translate, but only roughly.** Short, common sentences come out right
+  (*"I love you."* → *"Io ti amo ."*, *"The cat is on the table."* → *"Il gatto è sul tavolo ."*).
+  Long literary sentences lose meaning or repeat phrases. A held-out BLEU of ~7 is what a
+  75 M-parameter model gets from only 29 k sentence pairs with word-level vocabularies and
+  greedy decoding. It is **not** comparable to the paper's 27.3 BLEU (4.5 M pairs, BPE, beam search).
+- **Lowest validation loss did not pick the best translator.** Validation loss bottoms out at
+  epoch 11 and then rises, yet the final epoch scores +0.8 BLEU and lower WER on the same
+  held-out sentences (CER is level). With label smoothing, the loss also penalises the model's
+  growing over-confidence on words it gets wrong, while its top-ranked words keep improving.
+  This is why both checkpoints are evaluated and the final one is reported as the better model.
+- **It overfits heavily.** By epoch 20 the model scores 31.1 BLEU on training sentences against
+  7.0 on held-out ones, and training loss (2.54) is far below validation loss (5.16). More data,
+  a shared BPE vocabulary or stronger regularisation would be the next steps.
+- **The per-epoch BLEU in the training log is optimistic.** It is computed on the first 500
+  held-out sentences in length-sorted order, which average 9 tokens (vs. 29 for the full split).
+  It is useful for tracking the trend, but the full-split numbers above are the real result.
+  Per-epoch validation *loss* uses the whole held-out split.
+
+Translations of new sentences, written for this test and not taken from the dataset:
+
+| English | Epoch 11 (`best.pt`) | Epoch 20 (final) |
+|---|---|---|
+| The cat is on the table. | Il gatto è sulla tavola . | Il gatto è sul tavolo . |
+| I love you. | Io ti amo . | Io ti amo . |
+| I don't know what to do. | Non so che cosa fare . | Io non so cosa fare . |
+| She opened the window and looked at the garden. | Ella aprì la finestra e guardò il giardino . | Aprì lo sportello e guardò il giardino . |
+| He was very tired after the long journey. | Era molto lontano da tempo . | Era già stanco per il viaggio . |
+| We will leave tomorrow morning. | Ci di cena . | Andammo da domani a desinare . |
+
+More examples, including 15 random held-out sentences with their reference translations, are in
+[`results/translations.md`](results/translations.md); all scores are in
+[`results/metrics.json`](results/metrics.json). Outputs show punctuation as separate tokens
+(`tavolo .`) because the word-level tokenizer does not re-attach it.
 
 ## Dataset
 
@@ -134,11 +176,13 @@ Training writes to `opus_books_weights/`:
 
 | File | Size | Purpose |
 |---|---|---|
-| `best.pt` | ~300 MB | weights from the epoch with the lowest validation loss; used by `translate.py` and `evaluate.py` |
-| `tmodel_NN.pt` | ~900 MB | latest full checkpoint (weights + optimizer state), used only to resume; replaced every epoch |
-| `tokenizer_en.json`, `tokenizer_it.json` | < 1 MB | vocabularies the model was trained with; must stay with `best.pt` |
+| `best.pt` | ~290 MB | weights from the epoch with the lowest validation loss (epoch 11); the default for `translate.py` |
+| `tmodel_NN.pt` | ~860 MB | latest full checkpoint (weights + optimizer state), used to resume; replaced every epoch. After the run above this is `tmodel_19.pt` (epoch 20), the better translator |
+| `tokenizer_en.json`, `tokenizer_it.json` | < 1 MB | vocabularies the model was trained with; must stay with the checkpoints |
 
 The folder is git-ignored because of its size. Recreate it with `uv run python train.py`.
+Training again in the same folder replaces `tmodel_19.pt`, so copy it elsewhere first if you
+want to keep it.
 
 ## Evaluation
 
@@ -146,12 +190,16 @@ The folder is git-ignored because of its size. Recreate it with `uv run python t
 uv run python evaluate.py
 ```
 
-Loads `best.pt`, greedy-translates the full held-out split (3,233 sentences) and an equal-sized
-slice of the training set, and writes:
+Evaluates two checkpoints: `best.pt` (lowest validation loss) and the final `tmodel_NN.pt`.
+Each one greedy-translates the full held-out split (3,233 sentences) and an equal-sized slice of
+the training set. The checkpoint with the higher held-out BLEU is reported as the winner. It
+writes:
 
-- `results/metrics.json`: per-epoch history and final scores
-- `results/translations.md`: sample held-out translations and translations of new sentences
+- `results/metrics.json`: per-epoch history and both checkpoints' final scores
+- `results/translations.md`: held-out and new-sentence translations from both checkpoints, side by side
 - `results/training_curves.svg`: loss and BLEU per epoch
+
+Translating 3,233 sentences four times takes about 15 minutes on an Apple M5.
 
 BLEU is corpus BLEU-4 (`torchmetrics.BLEUScore`, ×100), computed after splitting references and
 outputs into words and punctuation the same way the tokenizer does, so `tavolo.` and `tavolo .`
@@ -170,13 +218,20 @@ Pass an integer to translate sentence *N* of opus_books and show its reference t
 uv run python translate.py 42
 ```
 
+`translate.py` loads `best.pt` by default. To use the final epoch, which scored higher in the
+evaluation above:
+
+```bash
+uv run python translate.py --checkpoint opus_books_weights/tmodel_19.pt "I love you."
+```
+
 From Python:
 
 ```python
 from translate import translate, translate_batch
 
 translate("I love you.")
-translate_batch(["Good morning.", "See you tomorrow."])
+translate_batch(["Good morning.", "See you tomorrow."], checkpoint="opus_books_weights/tmodel_19.pt")
 ```
 
 ## Logging

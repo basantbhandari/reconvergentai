@@ -161,11 +161,12 @@ def bleu_tokens(text: str, tokenizer: Tokenizer) -> str:
 def translate_loader(model, loader, tokenizer_tgt, device, limit: int | None = None):
     """Greedy-translate every batch in `loader`. Returns (sources, references, predictions)."""
     model.eval()
+    max_positions = model.tgt_pos.pe.size(1)  # decoder can't go past its positional-encoding length
     sources, references, predictions = [], [], []
     for batch in loader:
         enc  = batch["encoder_input"].to(device)
         mask = batch["encoder_mask"].to(device)
-        ids  = greedy_decode_batch(model, enc, mask, tokenizer_tgt, enc.size(1) + 50, device)
+        ids  = greedy_decode_batch(model, enc, mask, tokenizer_tgt, min(enc.size(1) + 50, max_positions), device)
         sources     += batch["src_text"]
         references  += batch["tgt_text"]
         predictions += [tokenizer_tgt.decode(r) for r in ids]

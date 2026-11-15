@@ -71,6 +71,7 @@ def plot_curves(history: list[dict], best_epoch: int, winner_epoch: int, path: P
         ax.axvline(best_epoch + 1, color=INK_2, linewidth=1, linestyle=(0, (3, 3)))
         ax.set_xlabel("epoch")
         ax.set_xlim(0.5, max(epochs) + 2.5)
+        ax.set_xticks([e for e in epochs if e == 1 or e % 5 == 0])
 
     for key, color, name in (("train_loss", BLUE, "train"), ("val_loss", ORANGE, "validation")):
         ys = [h[key] for h in history]
@@ -78,19 +79,21 @@ def plot_curves(history: list[dict], best_epoch: int, winner_epoch: int, path: P
         ax1.annotate(name, (epochs[-1], ys[-1]), xytext=(6, 0), textcoords="offset points",
                      va="center", color=INK_2)
     ax1.set_title("Cross-entropy loss (label smoothing 0.1)", loc="left", fontsize=11)
-    ax1.legend(frameon=False, loc="upper right")
+    ax1.legend(frameon=False, loc="upper right", bbox_to_anchor=(1, 0.88))
     ax1.annotate("lowest val loss", (best_epoch + 1, ax1.get_ylim()[1]), xytext=(4, -12),
                  textcoords="offset points", color=INK_2, fontsize=9)
 
     bleu = [h["bleu"] for h in history]
     ax2.plot(epochs, bleu, color=BLUE, linewidth=2, marker="o", markersize=4)
-    for e in sorted({best_epoch, winner_epoch}):
-        ax2.annotate(f"{bleu[e]:.1f}", (e + 1, bleu[e]), xytext=(0, 8),
-                     textcoords="offset points", ha="center", color=INK)
-    ax2.annotate(f"max {max(bleu):.1f}", (bleu.index(max(bleu)) + 1, max(bleu)), xytext=(0, -16),
-                 textcoords="offset points", ha="center", color=INK_2, fontsize=9)
-    ax2.set_title("Validation BLEU (500-sentence sample, greedy)", loc="left", fontsize=11)
-    ax2.set_ylim(bottom=0)
+    peak = bleu.index(max(bleu))
+    labels = {best_epoch: (f"{bleu[best_epoch]:.1f}", (0, 8), "center"),
+              winner_epoch: (f"{bleu[winner_epoch]:.1f}", (6, -4), "left"),
+              peak: (f"peak {bleu[peak]:.1f}", (0, 8), "center")}
+    for e, (text, offset, ha) in labels.items():
+        ax2.annotate(text, (e + 1, bleu[e]), xytext=offset, textcoords="offset points",
+                     ha=ha, color=INK if e != peak else INK_2, fontsize=10 if e != peak else 9)
+    ax2.set_title("Per-epoch BLEU (500 short held-out sentences, greedy)", loc="left", fontsize=11)
+    ax2.set_ylim(0, max(bleu) * 1.2)
 
     fig.tight_layout()
     fig.savefig(path, facecolor=SURFACE)
