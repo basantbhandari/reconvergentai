@@ -2,9 +2,11 @@
 
     uv run python translate.py "The cat is on the table." "Where is the station?"
     uv run python translate.py 42          # sentence #42 of opus_books, shown with its reference
+    uv run python translate.py --checkpoint opus_books_weights/tmodel_19.pt "I love you."
 """
 from __future__ import annotations
 
+import argparse
 import logging
 import sys
 import warnings
@@ -21,30 +23,36 @@ from train import get_device, greedy_decode_batch, setup_logging
 log = logging.getLogger("translate")
 
 
-@lru_cache(maxsize=1)
-def load_model():
-    """Load best.pt and the tokenizers. Returns (model, tokenizer_src, tokenizer_tgt, config, device)."""
+@lru_cache(maxsize=2)
+def load_model(checkpoint: str | None = None):
+    """Load a checkpoint and the tokenizers. Returns (model, tokenizer_src, tokenizer_tgt, config, device).
+
+    `checkpoint` defaults to best.pt. Both formats work: best.pt (weights + metadata)
+    and tmodel_NN.pt resume checkpoints (weights + optimizer state).
+    """
     config = get_config()
     device = get_device()
     tokenizer_src = Tokenizer.from_file(config["tokenizer_file"].format(config["lang_src"]))
     tokenizer_tgt = Tokenizer.from_file(config["tokenizer_file"].format(config["lang_tgt"]))
 
-    ckpt = best_weights_file_path(config)
+    ckpt = checkpoint or best_weights_file_path(config)
     if not Path(ckpt).exists():
         raise FileNotFoundError(f"{ckpt} not found. Train the model first: uv run python train.py")
     state = torch.load(ckpt, map_location=device)
     model = build_transformer(
-        state["src_vocab_size"], state["tgt_vocab_size"],
-        state["seq_len"], state["seq_len"], d_model=state["d_model"],
+        state.get("src_vocab_size", tokenizer_src.get_vocab_size()),
+        state.get("tgt_vocab_size", tokenizer_tgt.get_vocab_size()),
+        state.get("seq_len", config["seq_len"]), state.get("seq_len", config["seq_len"]),
+        d_model=state.get("d_model", config["d_model"]),
     ).to(device)
     model.load_state_dict(state["model_state_dict"])
     model.eval()
-    log.info("loaded %s (epoch %d, val_loss=%.4f) on %s", ckpt, state["epoch"], state["metrics"]["val_loss"], device)
+    log.info("loaded %s (epoch %d) on %s", ckpt, state["epoch"] + 1, device)
     return model, tokenizer_src, tokenizer_tgt, config, device
 
 
-def translate_batch(sentences: list[str]) -> list[str]:
-    model, tokenizer_src, tokenizer_tgt, config, device = load_model()
+def translate_batch(sentences: list[str], checkpoint: str | None = None) -> list[str]:
+    model, tokenizer_src, tokenizer_tgt, config, device = load_model(checkpoint)
     sos, eos, pad = (tokenizer_src.token_to_id(t) for t in ("[SOS]", "[EOS]", "[PAD]"))
 
     encoded = [[sos, *tokenizer_src.encode(s).ids[: config["seq_len"] - 2], eos] for s in sentences]
@@ -56,12 +64,16 @@ def translate_batch(sentences: list[str]) -> list[str]:
     return [tokenizer_tgt.decode(r) for r in ids]
 
 
-def translate(sentence: str) -> str:
-    return translate_batch([sentence])[0]
+def translate(sentence: str, checkpoint: str | None = None) -> str:
+    return translate_batch([sentence], checkpoint)[0]
 
 
-def main(args: list[str]) -> None:
-    args = args or ["I am not a very good student."]
+def main(argv: list[str]) -> None:
+    p = argparse.ArgumentParser(description="Translate English to Italian with the trained Transformer.")
+    p.add_argument("sentences", nargs="*", help="English sentences, or integer indices into opus_books")
+    p.add_argument("--checkpoint", help="checkpoint to load (default: opus_books_weights/best.pt)")
+    opts = p.parse_args(argv)
+    args = opts.sentences or ["I am not a very good student."]
     config = get_config()
     references: dict[int, str] = {}
     sentences = []
@@ -75,7 +87,7 @@ def main(args: list[str]) -> None:
         else:
             sentences.append(a)
 
-    for i, (src, pred) in enumerate(zip(sentences, translate_batch(sentences))):
+    for i, (src, pred) in enumerate(zip(sentences, translate_batch(sentences, opts.checkpoint))):
         print(f"SOURCE    : {src}")
         if i in references:
             print(f"TARGET    : {references[i]}")
