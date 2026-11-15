@@ -70,7 +70,9 @@ class KMeans:
             S = X.new_zeros(k, d).index_add_(0, labels, X)
 
             nonempty = N > 0
-            if (~nonempty).any():
+            dead_count = int((~nonempty).sum().item())
+            if dead_count:
+                log.debug("epoch %2d  dead_clusters=%d  reviving", epoch + 1, dead_count)
                 revive_dead_clusters(N, S, self.revival_tau, g)
 
             C = torch.where(

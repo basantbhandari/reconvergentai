@@ -24,11 +24,17 @@ log = logging.getLogger("benchmark")
 
 
 def setup_logging(level: str) -> None:
-    logging.basicConfig(
-        level=getattr(logging, level.upper()),
-        format="%(asctime)s  %(name)-20s  %(levelname)-8s  %(message)s",
+    lvl     = getattr(logging, level.upper())
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter(
+        fmt="%(asctime)s  %(name)-20s  %(levelname)-8s  %(message)s",
         datefmt="%H:%M:%S",
-    )
+    ))
+    for name in ("benchmark", "emeans"):
+        logger = logging.getLogger(name)
+        logger.setLevel(lvl)
+        logger.addHandler(handler)
+        logger.propagate = False
 
 
 def parse_args() -> argparse.Namespace:

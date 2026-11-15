@@ -115,11 +115,16 @@ class EMeans:
                 alpha = a0 * (eps + (1.0 - eps) * 0.5 * (1.0 + math.cos(math.pi * step / M)))
                 gamma = 1.0 - alpha
 
+                log.debug("step %4d  batch=%d  alpha=%.5f", step, len(batch), alpha)
+
                 N.mul_(gamma).add_(n_j, alpha=alpha)
                 S.mul_(gamma).add_(s_j, alpha=alpha)
 
                 step += 1
                 if step % self.revival_every == 0:
+                    dead_count = int((N < self.revival_tau * N.mean()).sum().item())
+                    if dead_count:
+                        log.debug("revival  step=%d  dead_clusters=%d", step, dead_count)
                     revive_dead_clusters(N, S, self.revival_tau, g)
 
                 if is_last and self.finalize:
