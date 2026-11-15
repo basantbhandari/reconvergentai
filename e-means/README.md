@@ -110,7 +110,21 @@ All components use Python's standard `logging` module under the `emeans.*` hiera
 |---|---|
 | `WARNING` | Errors and warnings only |
 | `INFO` (default) | Fit config, per-epoch MSE, timing, summary table |
-| `DEBUG` | All of the above plus any fine-grained internal events |
+| `DEBUG` | All of the above plus per-step alpha, batch size, and revival events |
+
+Example DEBUG output:
+
+```
+14:52:48  emeans.emeans         INFO      fit start  n=1000000  d=96  k=1024  epochs=3  B=32768  α₀=0.6960
+14:52:48  emeans.emeans         DEBUG     step    0  batch=32768  alpha=0.69600
+14:52:48  emeans.emeans         DEBUG     step    1  batch=32768  alpha=0.69582
+14:52:48  emeans.emeans         DEBUG     revival  step=5  dead_clusters=12
+14:52:48  emeans.emeans         DEBUG     step    5  batch=32768  alpha=0.69155
+...
+14:52:49  emeans.emeans         INFO      epoch  1/3  MSE=0.469409  elapsed=1.1s
+```
+
+Logging is scoped to the `emeans` and `benchmark` loggers with `propagate=False`, so third-party libraries (PyTorch, NumPy) are always silent regardless of the chosen level.
 
 To suppress per-epoch output and only see the summary:
 
