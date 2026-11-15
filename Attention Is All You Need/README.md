@@ -3,7 +3,8 @@
 PyTorch reproduction of **Attention Is All You Need**  
 ([Vaswani et al., 2017](https://arxiv.org/abs/1706.03762))
 
-The full encoder–decoder Transformer (the paper's *base* model), trained from scratch for
+An encoder–decoder Transformer sized like the paper's *base* model (see
+[differences from the paper](#differences-from-the-paper)), trained from scratch for
 English → Italian translation on the real
 [`Helsinki-NLP/opus_books`](https://huggingface.co/datasets/Helsinki-NLP/opus_books) corpus.
 The dataset is downloaded automatically from the Hugging Face Hub.
@@ -46,9 +47,22 @@ seeded, `train.py` and `evaluate.py` always use the same held-out sentences.
 
 ### Differences from the paper
 
-The model matches the paper's base configuration. The training setup is scaled down to
-one laptop GPU and a small dataset, so absolute scores are **not** comparable to the paper's
-27.3 BLEU (WMT'14 EN→DE).
+The layer counts, dimensions, heads, attention, positional encoding, dropout and label
+smoothing follow the paper's base model, but this is **not** an exact replica: it uses
+pre-LN and untied embeddings (hence 75.2 M parameters vs. the paper's ~65 M). The training
+setup is also scaled down to one laptop GPU and a small dataset, so absolute scores are
+**not** comparable to the paper's 27.3 BLEU (WMT'14 EN→DE).
+
+**Architecture**
+
+| | Paper | This repo |
+|---|---|---|
+| Layer norm | after each sub-layer: `LayerNorm(x + Sublayer(x))` (post-LN) | before each sub-layer: `x + Sublayer(LayerNorm(x))` (pre-LN), plus a final norm after each stack |
+| Weight sharing | one matrix shared by both embeddings and the pre-softmax projection | separate source embedding, target embedding and projection (no sharing) |
+| Attention dropout | not described (dropout on sub-layer outputs and embeddings only) | dropout also applied to the attention weights |
+| LayerNorm formula | standard, `(x − μ) / √(σ² + ε)` | `(x − μ) / (σ + ε)` with unbiased σ |
+
+**Training**
 
 | | Paper | This repo |
 |---|---|---|
@@ -56,7 +70,6 @@ one laptop GPU and a small dataset, so absolute scores are **not** comparable to
 | Tokenization | shared BPE, ~37 k | separate word-level vocabularies |
 | LR schedule | warmup 4,000 steps, then ∝ step⁻⁰·⁵; Adam β₂=0.98 | constant 1e-4; Adam β₂=0.999 |
 | Batch | ~25 k source + 25 k target tokens, 8 GPUs | ≤ 2,048 tokens, 1 Apple-silicon GPU (MPS) |
-| Layer norm | after each sub-layer (post-LN) | before each sub-layer (pre-LN) |
 | Decoding | beam search (size 4), checkpoint averaging | greedy, single best checkpoint |
 
 ### Efficient batching
