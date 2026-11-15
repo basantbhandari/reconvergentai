@@ -91,6 +91,42 @@ Options:
 | `--n` | all | Rows to load |
 | `--data` | `data/deep1m.fbin` | Dataset path |
 | `--out` | `output/benchmark_results.png` | Plot output path |
+| `--log-level` | `INFO` | Logging verbosity (`DEBUG`, `INFO`, `WARNING`) |
+
+## Logging
+
+All components use Python's standard `logging` module under the `emeans.*` hierarchy. Each log line includes a timestamp, logger name, level, and message:
+
+```
+14:49:30  benchmark             INFO      device=mps  dataset=data/deep1m.fbin  k=1024
+14:49:30  emeans.emeans         INFO      fit start  n=1000000  d=96  k=1024  epochs=3  B=32768  α₀=0.6960
+14:49:31  emeans.emeans         INFO      epoch  1/3  MSE=0.469409  elapsed=1.1s
+14:49:33  emeans.emeans         INFO      fit done  total=3.2s  final_MSE=0.463221
+```
+
+**Log levels:**
+
+| Level | What you see |
+|---|---|
+| `WARNING` | Errors and warnings only |
+| `INFO` (default) | Fit config, per-epoch MSE, timing, summary table |
+| `DEBUG` | All of the above plus any fine-grained internal events |
+
+To suppress per-epoch output and only see the summary:
+
+```bash
+uv run python benchmark.py --log-level WARNING
+```
+
+To integrate logging in your own code:
+
+```python
+import logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+
+from emeans import EMeans
+em = EMeans(n_clusters=1024, epochs=3).fit(X)
+```
 
 ## Installation
 
