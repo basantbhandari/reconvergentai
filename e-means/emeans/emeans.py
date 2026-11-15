@@ -1,8 +1,9 @@
 """E-Means: mini-batch K-Means with EMA statistics and cosine-annealed step size."""
 from __future__ import annotations
 
-import gc
+import logging
 import math
+import time
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -12,6 +13,8 @@ from .config import auto_alpha0, auto_batch_size
 from ._ops import assign, default_device, quantization_error, revive_dead_clusters
 
 __all__ = ["EMeans"]
+
+log = logging.getLogger(__name__)
 
 _TINY = 1e-10
 
@@ -66,12 +69,15 @@ class EMeans:
         n, d = X.shape
         k    = self.n_clusters
 
-        B = self.batch_size or auto_batch_size(n, k, self.epochs)
-        a0 = self.alpha0 or auto_alpha0(n, k, B, self.epochs)
+        B  = self.batch_size or auto_batch_size(n, k, self.epochs)
+        a0 = self.alpha0     or auto_alpha0(n, k, B, self.epochs)
         self.batch_size_ = B
         self.alpha0_     = a0
 
         chunk = self.dist_chunk or max(64, (64 * 1024 * 1024) // (k * 4))
+
+        log.info("fit start  n=%d  d=%d  k=%d  epochs=%d  B=%d  α₀=%.4f  chunk=%d  device=%s",
+                 n, d, k, self.epochs, B, a0, chunk, dev)
 
         g = torch.Generator(device=dev)
         g.manual_seed(self.seed)
@@ -80,20 +86,19 @@ class EMeans:
         C0  = X[idx].clone()
 
         N = X.new_full((k,), _TINY)
-        S = N.unsqueeze(1) * C0           # S/N == C0 at step 0
+        S = N.unsqueeze(1) * C0
 
-        eps = self.eps_schedule
-        M   = self.epochs * math.ceil(n / B)
-        step = 0
-
-        last_S: Optional[torch.Tensor] = None
-        last_N: Optional[torch.Tensor] = None
+        eps      = self.eps_schedule
+        M        = self.epochs * math.ceil(n / B)
+        step     = 0
+        t_start  = time.perf_counter()
 
         self.history_.clear()
         last_epoch = self.epochs - 1
 
         for epoch in range(self.epochs):
-            perm = torch.randperm(n, generator=g, device=dev)
+            t_epoch = time.perf_counter()
+            perm    = torch.randperm(n, generator=g, device=dev)
             is_last = epoch == last_epoch
 
             if is_last and self.finalize:
@@ -101,9 +106,7 @@ class EMeans:
                 fin_N = X.new_zeros(k)
 
             for start in range(0, n, B):
-                batch = X[perm[start : start + B]]
-                nb    = len(batch)
-
+                batch  = X[perm[start : start + B]]
                 labels = assign(batch, S / N.clamp_min(_TINY).unsqueeze(1), chunk)
 
                 n_j = torch.bincount(labels, minlength=k).float()
@@ -125,7 +128,11 @@ class EMeans:
 
             with torch.no_grad():
                 C_now = S / N.clamp_min(_TINY).unsqueeze(1)
-            self.history_.append(quantization_error(X, C_now, chunk))
+            mse = quantization_error(X, C_now, chunk)
+            self.history_.append(mse)
+
+            log.info("epoch %2d/%d  MSE=%.6f  elapsed=%.1fs",
+                     epoch + 1, self.epochs, mse, time.perf_counter() - t_epoch)
 
         if self.finalize:
             nonempty = fin_N > 0
@@ -135,10 +142,11 @@ class EMeans:
         else:
             self.cluster_centers_ = S / N.clamp_min(_TINY).unsqueeze(1)
 
+        log.info("fit done  total=%.1fs  final_MSE=%.6f", time.perf_counter() - t_start, self.history_[-1])
         return self
 
     def predict(self, X: torch.Tensor) -> torch.Tensor:
         assert self.cluster_centers_ is not None, "Call fit() first."
-        dev = self.cluster_centers_.device
+        dev   = self.cluster_centers_.device
         chunk = self.dist_chunk or max(64, (64 * 1024 * 1024) // (self.n_clusters * 4))
         return assign(X.to(dev, dtype=torch.float32), self.cluster_centers_, chunk)

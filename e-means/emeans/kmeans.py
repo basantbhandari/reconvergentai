@@ -1,6 +1,8 @@
 """Lloyd's K-Means: standard full-batch EM iterations."""
 from __future__ import annotations
 
+import logging
+import time
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -9,6 +11,8 @@ import torch
 from ._ops import assign, default_device, quantization_error, revive_dead_clusters
 
 __all__ = ["KMeans"]
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -46,6 +50,9 @@ class KMeans:
 
         chunk = self.dist_chunk or max(64, (64 * 1024 * 1024) // (k * 4))
 
+        log.info("fit start  n=%d  d=%d  k=%d  epochs=%d  chunk=%d  device=%s",
+                 n, d, k, self.epochs, chunk, dev)
+
         g = torch.Generator(device=dev)
         g.manual_seed(self.seed)
 
@@ -53,17 +60,17 @@ class KMeans:
         C   = X[idx].clone()
 
         self.history_.clear()
+        t_start = time.perf_counter()
 
-        for _ in range(self.epochs):
-            labels = assign(X, C, chunk)
+        for epoch in range(self.epochs):
+            t_epoch = time.perf_counter()
+            labels  = assign(X, C, chunk)
 
             N = torch.bincount(labels, minlength=k).float()
             S = X.new_zeros(k, d).index_add_(0, labels, X)
 
             nonempty = N > 0
-
-            dead = (~nonempty).nonzero(as_tuple=False).flatten()
-            if dead.numel() > 0:
+            if (~nonempty).any():
                 revive_dead_clusters(N, S, self.revival_tau, g)
 
             C = torch.where(
@@ -72,9 +79,14 @@ class KMeans:
                 C,
             )
 
-            self.history_.append(quantization_error(X, C, chunk))
+            mse = quantization_error(X, C, chunk)
+            self.history_.append(mse)
+
+            log.info("epoch %2d/%d  MSE=%.6f  elapsed=%.1fs",
+                     epoch + 1, self.epochs, mse, time.perf_counter() - t_epoch)
 
         self.cluster_centers_ = C
+        log.info("fit done  total=%.1fs  final_MSE=%.6f", time.perf_counter() - t_start, self.history_[-1])
         return self
 
     def predict(self, X: torch.Tensor) -> torch.Tensor:
