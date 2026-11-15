@@ -85,3 +85,22 @@ uv sync
 | XOR | **no** | **no** |
 
 A single perceptron cannot solve XOR — this motivated the development of multi-layer networks.
+
+## Benchmark Results
+
+**Logic Gates** (lr=0.1, max 20 epochs):
+
+| Gate | Accuracy | Epochs to Converge | Separable |
+|---|---|---|---|
+| AND | 100% | 4 | yes |
+| OR | 100% | 4 | yes |
+| NAND | 100% | 6 | yes |
+| NOR | 100% | 4 | yes |
+| XOR | 50% | — (did not converge) | **no** |
+
+**Real Dataset** — `make_classification` (1000 samples, 10 features, 80/20 split, lr=0.1, 50 epochs):
+
+| | Test Accuracy |
+|---|---|
+| Scratch Perceptron | **87.00%** |
+| Sklearn Perceptron | 80.00% |
