@@ -1,17 +1,14 @@
 [project]
-name = "reconvergentai"
+name = "attention-is-all-you-need"
 version = "0.1.0"
-requires-python = ">=3.9"
+description = "reproduction of 'Attention Is All You Need' (Vaswani et al., 2017)"
+readme = "README.md"
+requires-python = ">=3.14"
 dependencies = [
-    "altair>=6.0.0",
     "datasets>=4.5.0",
-    "ipykernel>=6.31.0",
-    "matplotlib>=3.9.4",
-    "numpy>=2.0.2",
-    "pandas>=2.3.3",
-    "scikit-learn>=1.6.1",
+    "matplotlib>=3.11.2",
     "tokenizers>=0.22.2",
-    "torch>=2.8.0",
+    "torch>=2.15.0",
     "torchmetrics>=1.8.2",
     "tqdm>=4.68.2",
     "wandb>=0.26.1",
