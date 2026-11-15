@@ -27,7 +27,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--km-epochs",  type=int, default=25,    help="Lloyd K-Means epochs")
     p.add_argument("--n",          type=int, default=None,  help="rows to load (default: all)")
     p.add_argument("--data",       type=str, default="data/deep1m.fbin")
-    p.add_argument("--out",        type=str, default="benchmark_results.png")
+    p.add_argument("--out",        type=str, default="output/benchmark_results.png")
     return p.parse_args()
 
 
@@ -105,6 +105,7 @@ def main():
     print("=" * 55)
 
     # Convergence plot
+    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.plot(range(1, len(em_hist) + 1), em_hist, "o-", label=f"E-Means ({args.em_epochs} ep)")
     ax.plot(range(1, len(km_hist) + 1), km_hist, "s--", label=f"K-Means ({args.km_epochs} ep)", alpha=0.8)

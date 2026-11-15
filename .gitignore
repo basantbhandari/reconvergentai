@@ -216,5 +216,6 @@ __marimo__/
 data/
 
 # Benchmark outputs
+output/
 *.png
 benchmark_results*
