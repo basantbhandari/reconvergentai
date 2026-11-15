@@ -27,11 +27,14 @@ where `ε = 0.1`, `M` = total mini-batch steps, and `α₀` is derived from scal
 
 | | E-Means (3 epochs) | K-Means (25 epochs) |
 |---|---|---|
-| Time | 8.2 s | 56.8 s |
-| Final MSE | 0.4632 | 0.4639 |
-| Speed-up | **6.9×** | — |
+| Time | 3.3 s | 25.7 s |
+| Final MSE | 0.463221 | 0.463857 |
+| Best MSE | 0.463221 (epoch 3) | 0.463857 (epoch 25) |
+| Speed-up | **7.79×** | — |
 
 E-Means reaches lower quantization error in 3 epochs than Lloyd's algorithm does in 25.
+
+> Benchmarked on Apple M-series (MPS), DEEP1M dataset, k=1024.
 
 ## Project Structure
 
