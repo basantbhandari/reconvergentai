@@ -215,6 +215,11 @@ __marimo__/
 *.npy
 data/
 
+# Trained model weights / tokenizers (Attention Is All You Need)
+opus_books_weights/
+runs/
+wandb/
+
 # Benchmark outputs
 output/
 *.png
