@@ -209,3 +209,12 @@ __marimo__/
 .idea
 .vscode
 .DS_Store
+
+# Large dataset files
+*.fbin
+*.npy
+data/
+
+# Benchmark outputs
+*.png
+benchmark_results*
